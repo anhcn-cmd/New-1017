@@ -417,7 +417,7 @@ body{background:var(--bg);color:var(--ink);font-family:'Roboto',system-ui,sans-s
 .tr-list{flex:1;}
 .tr{
   display:grid;
-  grid-template-columns:52px 1fr auto auto auto auto 28px;
+  grid-template-columns:52px 1fr auto auto auto 28px;
   align-items:center;gap:10px;
   padding:13px 22px;border-bottom:1px solid var(--line);
   cursor:pointer;transition:background .12s;
@@ -2119,7 +2119,7 @@ body{background:var(--bg);color:var(--ink);font-family:'Roboto',system-ui,sans-s
 <div class="page-view" id="pv-gantt">
   <div class="sh" style="margin-bottom:14px;">
     <div class="sh-left"><div class="sh-line"></div><div class="sh-lbl">Timeline triển khai — toàn bộ nhiệm vụ</div></div>
-    <div class="sh-sub">Trục thời gian theo tháng · phần đậm = đã thực hiện theo % tiến độ · phần nhạt = còn lại đến hạn</div>
+    <div class="sh-sub">Trục thời gian theo tháng · thanh đậm = đã hoàn thành · thanh nhạt = chưa hoàn thành, kéo dài đến hạn</div>
   </div>
   <div class="gantt-card">
     <div class="gantt-filters">
@@ -2322,6 +2322,10 @@ function showToast() {
    REBUILD
    ============================================================ */
 function rebuild() {
+  /* Tiến độ tính theo số lượng: việc Hoàn thành = 100, còn lại = 0 */
+  const _sp=x=>{x.progress=x.status==='Hoàn thành'?100:0;};
+  raw.forEach(p=>{_sp(p);(p.children||[]).forEach(_sp);});
+  (events||[]).forEach(_sp);
   expandedTRs.clear(); expandedChildren.clear();
   renderKPIs();
   renderCharts();
@@ -2637,7 +2641,7 @@ function renderBar(){
         // Diamond fill = progress%
         const fill = pct>=90?'#fff':pct>=50?'rgba(255,255,255,.75)':'rgba(255,255,255,.45)';
         diamonds += `<div onclick="event.stopPropagation();openTaskModal('${t.tt}')"
-          title="${esc(t.tt+': '+t.task+'\n'+t.status+' · '+pct+'%')}"
+          title="${esc(t.tt+': '+t.task+'\n'+t.status)}"
           style="
             width:22px;height:22px;
             background:${fill};
@@ -2842,7 +2846,6 @@ function renderAlerts(){
           <div class="al-ban">Ban chủ trì: ${esc(unitShortName(d))}</div>
         </div>
         ${daysHtml}
-        <div class="al-pct">${d.progress}%</div>
       </div>`;}).join('')
     :'<div style="padding:16px 0;text-align:center;color:var(--ink-mute);font-size:.8rem;"><i class="fa-solid fa-circle-check" style="color:var(--green);margin-right:6px;"></i>Không có cảnh báo ưu tiên.</div>';
 }
@@ -3021,15 +3024,12 @@ function renderGanttPage(){
         <!-- done bar (solid, pct% of planned width) -->
         <div style="position:absolute;left:0;width:${doneW}%;height:100%;
           background:${col};border-radius:4px;display:flex;align-items:center;justify-content:flex-end;padding-right:4px;">
-          ${doneWpx>6?`<span style="font-size:.66rem;font-weight:700;color:#fff;white-space:nowrap;">${pct}%</span>`:''}
         </div>
         <!-- deadline diamond -->
         <div title="Hạn: ${esc(d.deadline||'')} · ${esc(d.dueDate||'')}"
           style="position:absolute;left:calc(${(endFrac*100).toFixed(2)}% - 5px);top:50%;
             transform:translateY(-50%) rotate(45deg);
             width:8px;height:8px;background:${col};z-index:3;border:2px solid #fff;"></div>
-        <!-- pct label if bar too small to show inside -->
-        ${doneWpx<=6?`<div style="position:absolute;left:calc(${doneW}% + 4px);top:50%;transform:translateY(-50%);font-size:.64rem;font-weight:700;color:${col};white-space:nowrap;">${pct}%</div>`:''}
       </div>`;
     } else {
       barHtml = `<div class="gantt-bar-track">
@@ -3047,7 +3047,7 @@ function renderGanttPage(){
             ${esc(d.task)}
           </div>
           <div style="font-size:.68rem;color:var(--ink-mute);margin-top:2px;">
-            ${esc(unitShort)} · <b style="color:${col};">${pct}%</b>
+            ${esc(unitShort)}
             ${d.deadline?`· <span style="color:var(--ink-mute)">${esc(d.deadline)}</span>`:''}
           </div>
         </div>
@@ -3301,10 +3301,6 @@ function renderTaskRows(tasks){
       <span class="tr-unit">Chủ trì: ${uc.length>14?uc.slice(0,14)+'…':uc}</span>
       <span class="badge ${SCC[d.status]||'b-doing'}">${d.status}</span>
       <span class="tr-deadline"><i class="fa-regular fa-circle" style="font-size:.45rem;color:${SC[d.status]||'#8b90ad'};vertical-align:middle;margin-right:4px;"></i>${d.deadline||'—'}</span>
-      <div class="tr-prog">
-        <div class="tr-ptrack"><div class="tr-pfill" style="width:${d.progress}%;background:${fc};"></div></div>
-        <div class="tr-ppct">${d.progress}%</div>
-      </div>
       <i class="fa-solid fa-chevron-right tr-arr"></i>
     </div>
     <div class="tr-body ${isOpen?'on':''}" id="trb-${d.tt}">
@@ -3352,10 +3348,6 @@ function buildParentBody(d){
             ${c.status}
           </div>
           <div class="cr-prog-wrap">
-            <div class="cr-prog-track">
-              <div class="cr-prog-fill" style="width:${c.progress}%;"></div>
-            </div>
-            <span class="cr-prog-pct">${c.progress}%</span>
             ${c.deadline?`<span class="cr-prog-total">${c.deadline}</span>`:''}
           </div>
           <i class="fa-solid fa-chevron-right cr-arr"></i>
@@ -3480,7 +3472,6 @@ function _popupRenderTable(){
     '<th style="width:120px;">Thời hạn</th>'+
     '<th style="min-width:80px;">Ban chủ trì</th>'+
     '<th style="min-width:140px;">Hiện trạng triển khai</th>'+
-    '<th style="width:90px;">Tiến độ</th>'+
     '</tr></thead><tbody>'+
     fi.map(d=>_buildPopupRow(d)).join('')+
     '</tbody></table></div>';
@@ -3511,7 +3502,7 @@ function _buildPopupRow(d, indent){
   // Child rows if has kids (collapsed by default)
   const childHtml=hasKids
     ?`<tr id="ppk-${_tt}" style="display:none;">
-        <td colspan="7" style="padding:0;">
+        <td colspan="6" style="padding:0;">
           <table style="width:100%;border-collapse:collapse;">
             ${d.children.map(c=>_buildPopupRow({...c,tt:c.subNo},true)).join('')}
           </table>
@@ -3526,14 +3517,6 @@ function _buildPopupRow(d, indent){
     <td style="font-size:.75rem;white-space:nowrap;">${d.deadline||'—'}</td>
     <td style="font-size:.74rem;">${(d.unit||'').split(';')[0].replace(/\n/g,' ').split('(')[0].trim()||'—'}</td>
     <td style="max-width:160px;">${htCell}</td>
-    <td>
-      <div style="display:flex;align-items:center;gap:5px;min-width:70px;">
-        <div style="flex:1;height:5px;background:var(--haze);border-radius:3px;overflow:hidden;">
-          <div style="height:100%;width:${d.progress||0}%;background:${progColor(d.progress||0)};border-radius:3px;"></div>
-        </div>
-        <span style="font-size:.72rem;font-weight:700;color:var(--ink-soft);min-width:24px;">${d.progress||0}%</span>
-      </div>
-    </td>
   </tr>${childHtml}`;
 }
 
@@ -3603,13 +3586,6 @@ function openTaskModal(tt, fromPopupTitle, fromPopupItems, fromPopupLabel){
         <div class="dv" style="color:var(--ink-soft);font-size:.8rem;">${d.groupLabel||''}</div></div>
       <div class="dtl-f"><label>Trạng thái</label>
         <div class="dv"><span class="badge ${SCC[d.status]||'b-doing'}">${d.status}</span></div></div>
-      <div class="dtl-f"><label>Tiến độ</label>
-        <div class="dv" style="padding-top:4px;display:flex;align-items:center;gap:8px;">
-          <div style="flex:1;height:7px;background:var(--haze);border-radius:4px;overflow:hidden;">
-            <div style="height:100%;width:${d.progress}%;background:${fc};border-radius:4px;"></div>
-          </div>
-          <b style="color:${fc};font-size:.9rem;">${d.progress}%</b>
-        </div></div>
       <div class="dtl-f"><label>Mã</label>
         <div class="dv" style="font-weight:700;font-size:1rem;color:var(--indigo);">${d.tt||d.subNo}</div></div>
       <div class="dtl-f"><label>Thời hạn hoàn thành</label>
@@ -3664,8 +3640,8 @@ async function exportMExcel(){
   const items=document.getElementById('mainModal')._items||[];
   const wb=XLSX.utils.book_new();
   const ws=XLSX.utils.aoa_to_sheet([
-    ['Mã','Nhiệm vụ','Nhóm OECD','Ban chủ trì','Đơn vị phối hợp','Thời hạn','Trạng thái','Tiến độ (%)','TV HĐTV','TV BTGĐ','Sản phẩm đầu ra','Link Sản phẩm'],
-    ...items.map(d=>[d.tt||d.subNo,d.task,d.groupLabel,d.unit,d.counit,d.deadline,d.status,d.progress,d.tvHDTV,d.tvBTGD,d.output,d.link||''])
+    ['Mã','Nhiệm vụ','Nhóm OECD','Ban chủ trì','Đơn vị phối hợp','Thời hạn','Trạng thái','TV HĐTV','TV BTGĐ','Sản phẩm đầu ra','Link Sản phẩm'],
+    ...items.map(d=>[d.tt||d.subNo,d.task,d.groupLabel,d.unit,d.counit,d.deadline,d.status,d.tvHDTV,d.tvBTGD,d.output,d.link||''])
   ]);
   XLSX.utils.book_append_sheet(wb,ws,'Chi tiết');
   XLSX.writeFile(wb,'PVEP_ChiTiet_'+new Date().toISOString().slice(0,10)+'.xlsx');
@@ -3684,8 +3660,8 @@ async function exportMPDF(){
 function exportExcel(){
   const wb=XLSX.utils.book_new();
   const ws=XLSX.utils.aoa_to_sheet([
-    ['Mã','Nhiệm vụ cụ thể','Nhóm OECD','Ban/VP chủ trì','Đơn vị phối hợp','Thời hạn','Trạng thái','Tiến độ (%)','TV HĐTV','TV BTGĐ','Link Sản phẩm'],
-    ...raw.map(d=>[d.tt,d.task,d.groupLabel,d.unit,d.counit,d.deadline,d.status,d.progress,d.tvHDTV,d.tvBTGD,d.link||''])
+    ['Mã','Nhiệm vụ cụ thể','Nhóm OECD','Ban/VP chủ trì','Đơn vị phối hợp','Thời hạn','Trạng thái','TV HĐTV','TV BTGĐ','Link Sản phẩm'],
+    ...raw.map(d=>[d.tt,d.task,d.groupLabel,d.unit,d.counit,d.deadline,d.status,d.tvHDTV,d.tvBTGD,d.link||''])
   ]);
   ws['!cols']=[{wch:8},{wch:65},{wch:55},{wch:18},{wch:18},{wch:20},{wch:15},{wch:12},{wch:24},{wch:24},{wch:40}];
   XLSX.utils.book_append_sheet(wb,ws,'KH OECD PVEP 2026');
